@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 # =========================================================
-# BPNN-Based RAC Total Creep Prediction System
+# BPNN-Based RAC Creep Prediction System
 # MATLAB exported model:
 # BPNN_Creep_Web_Model.mat
 # =========================================================
@@ -365,11 +365,11 @@ st.set_page_config(
     layout="centered"
 )
 
-st.title("BPNN-Based RAC Total Creep Prediction System")
+st.title("BPNN-Based RAC Creep Prediction System")
 
 st.markdown(
     """
-    This web application predicts the **total creep of recycled aggregate concrete (RAC)**
+    This web application predicts the **creep of recycled aggregate concrete (RAC)**
     using a MATLAB-trained BPNN model.
     """
 )
@@ -392,7 +392,7 @@ feature_labels = [
     "Creep test duration (Y8)"
 ]
 
-output_label = "Predicted total creep of RAC (Z)"
+output_label = "Predicted creep of RAC (Z)"
 
 st.subheader("Input Parameters")
 
