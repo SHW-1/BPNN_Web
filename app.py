@@ -369,7 +369,7 @@ st.title("BPNN-Based RAC Creep Prediction System")
 
 st.markdown(
     """
-    This web application predicts the **creep of recycled aggregate concrete (RAC)**
+    This web application predicts the **specific creep of recycled aggregate concrete (RAC)**
     using a MATLAB-trained BPNN model.
     """
 )
@@ -381,18 +381,25 @@ except Exception as e:
     st.stop()
 
 
+# Display units only. All input values still use the numeric convention
+# of the original MATLAB training data; no unit conversion is performed.
 feature_labels = [
-    "Ordinary Portland cement content (Y1)",
-    "RAC sand ratio (Y2)",
-    "RAC water-binder ratio (Y3)",
-    "Mixed coarse aggregate water absorption (Y4)",
-    "Creep test humidity (Y5)",
-    "Compressive strength (Y6)",
-    "Stress ratio (Y7)",
-    "Creep test duration (Y8)"
+    "Ordinary Portland cement content (Y1, kg/m³)",
+    "RAC sand ratio (Y2, %)",
+    "RAC water-binder ratio (Y3, dimensionless)",
+    "Mixed coarse aggregate water absorption (Y4, %)",
+    "Creep test relative humidity (Y5, %)",
+    "Compressive strength (Y6, MPa)",
+    "Stress ratio (Y7, dimensionless)",
+    "Creep test duration (Y8, days)"
 ]
 
-output_label = "Predicted creep of RAC (Z)"
+feature_units = ["kg/m³", "%", "", "%", "%", "MPa", "", "days"]
+
+# Specific creep is conventionally presented in microstrain per MPa.
+# Verify that output_scale produces this numeric convention in the MATLAB model.
+SPECIFIC_CREEP_UNIT = "×10⁻⁶/MPa"
+output_label = "Predicted specific creep of RAC (Z)"
 
 st.subheader("Input Parameters")
 
@@ -408,7 +415,10 @@ for i, label in enumerate(feature_labels):
     help_text = None
 
     if not np.isnan(min_value) and not np.isnan(max_value):
-        help_text = f"Training data range: {min_value:.6g} to {max_value:.6g}"
+        unit_suffix = f" {feature_units[i]}" if feature_units[i] else ""
+        help_text = (
+            f"Training data range: {min_value:.6g} to {max_value:.6g}{unit_suffix}"
+        )
 
     if not np.isnan(min_value) and not np.isnan(max_value) and max_value > min_value:
         step_value = float((max_value - min_value) / 100.0)
@@ -437,13 +447,13 @@ if st.button("Predict", use_container_width=True):
         lower95 = prediction + model["residual_low95"]
         upper95 = prediction + model["residual_high95"]
 
-        st.success(f"{output_label}: {prediction:.6f}")
+        st.success(f"{output_label}: {prediction:.6f} {SPECIFIC_CREEP_UNIT}")
 
         st.markdown("### Uncertainty Analysis")
 
         st.info(
             f"""
-            **95% Predictive Interval:** [{lower95:.6f}, {upper95:.6f}]
+            **95% Predictive Interval:** [{lower95:.6f}, {upper95:.6f}] {SPECIFIC_CREEP_UNIT}
 
             **Interval method:** Residual calibration based on the test set.
             """
@@ -471,8 +481,8 @@ with st.expander("Model Consistency Check"):
     st.write(f"LW shape: `{model['W2'].shape}`")
     st.write(f"input_process_A shape: `{model['input_process_A'].shape}`")
     st.write(f"output_reverse_A shape: `{model['output_reverse_A'].shape}`")
-    st.write(f"95% residual lower bound: `{model['residual_low95']}`")
-    st.write(f"95% residual upper bound: `{model['residual_high95']}`")
+    st.write(f"95% residual lower bound: `{model['residual_low95']}` {SPECIFIC_CREEP_UNIT}")
+    st.write(f"95% residual upper bound: `{model['residual_high95']}` {SPECIFIC_CREEP_UNIT}")
 
     if model["x_check"] is not None and model["y_check_web_matlab"] is not None:
         py_check = predict_creep(model["x_check"], model)
@@ -482,6 +492,6 @@ with st.expander("Model Consistency Check"):
         st.write("MATLAB exported check input:")
         st.write(model["x_check"])
 
-        st.write(f"MATLAB reference prediction: `{matlab_check:.10f}`")
-        st.write(f"Python reproduced prediction: `{py_check:.10f}`")
-        st.write(f"Difference: `{diff:.10e}`")
+        st.write(f"MATLAB reference prediction: `{matlab_check:.10f}` {SPECIFIC_CREEP_UNIT}")
+        st.write(f"Python reproduced prediction: `{py_check:.10f}` {SPECIFIC_CREEP_UNIT}")
+        st.write(f"Difference: `{diff:.10e}` {SPECIFIC_CREEP_UNIT}")
