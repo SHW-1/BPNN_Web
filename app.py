@@ -383,7 +383,7 @@ feature_labels = [
 feature_units = ["kg/m³", "%", "", "%", "%", "MPa", "", "days"]
 
 # Confirm this unit with the actual MATLAB output_scale convention.
-SPECIFIC_CREEP_UNIT = "×10⁻⁶/MPa"
+SPECIFIC_CREEP_UNIT_HTML = f"×10<sup>{MINUS_SIGN}6</sup>/MPa"
 output_label = "Predicted specific creep of RAC (Z)"
 
 st.subheader("Input Parameters")
@@ -435,18 +435,32 @@ if st.button("Predict", use_container_width=True):
             lower95 = prediction + model["residual_low95"]
             upper95 = prediction + model["residual_high95"]
 
-            st.success(
-                f"{output_label}: {display_number(prediction)} {SPECIFIC_CREEP_UNIT}"
+            # The exponent is formatted with an HTML superscript; its
+            # actual character is U+2212, not the superscript-minus U+207B.
+            # st.markdown supports HTML, while native st.success/st.info
+            # do not guarantee rendering of <sup> markup.
+            st.markdown(
+                '<div style="background:rgba(24,160,88,.10); '
+                'border-left:4px solid #16a34a; padding:12px 14px; '
+                'border-radius:6px; margin:12px 0;">'
+                f'<strong>{output_label}:</strong> '
+                f'{display_number(prediction)} {SPECIFIC_CREEP_UNIT_HTML}'
+                '</div>',
+                unsafe_allow_html=True,
             )
 
             st.markdown("### Uncertainty Analysis")
-            st.info(
-                f"""
-                **95% Predictive Interval:**
-                [{display_number(lower95)}, {display_number(upper95)}] {SPECIFIC_CREEP_UNIT}
-
-                **Interval method:** Residual calibration based on the test set.
-                """
+            st.markdown(
+                '<div style="background:rgba(59,130,246,.10); '
+                'border-left:4px solid #3b82f6; padding:12px 14px; '
+                'border-radius:6px; margin:12px 0;">'
+                '<strong>95% Predictive Interval:</strong> '
+                f'[{display_number(lower95)}, {display_number(upper95)}] '
+                f'{SPECIFIC_CREEP_UNIT_HTML}'
+                '<p style="margin:10px 0 0;"><strong>Interval method:</strong> '
+                'Residual calibration based on the test set.</p>'
+                '</div>',
+                unsafe_allow_html=True,
             )
 
             st.markdown("### Input Summary")
@@ -469,13 +483,15 @@ with st.expander("Model Consistency Check"):
     st.write(f"LW shape: `{model['W2'].shape}`")
     st.write(f"input_process_A shape: `{model['input_process_A'].shape}`")
     st.write(f"output_reverse_A shape: `{model['output_reverse_A'].shape}`")
-    st.write(
+    st.markdown(
         "95% residual lower bound: "
-        f"`{display_number(model['residual_low95'], '.12g')}` {SPECIFIC_CREEP_UNIT}"
+        f"`{display_number(model['residual_low95'], '.12g')}` {SPECIFIC_CREEP_UNIT_HTML}",
+        unsafe_allow_html=True,
     )
-    st.write(
+    st.markdown(
         "95% residual upper bound: "
-        f"`{display_number(model['residual_high95'], '.12g')}` {SPECIFIC_CREEP_UNIT}"
+        f"`{display_number(model['residual_high95'], '.12g')}` {SPECIFIC_CREEP_UNIT_HTML}",
+        unsafe_allow_html=True,
     )
 
     if model["x_check"] is not None and model["y_check_web_matlab"] is not None:
@@ -489,14 +505,17 @@ with st.expander("Model Consistency Check"):
             language=None,
         )
 
-        st.write(
+        st.markdown(
             "MATLAB reference prediction: "
-            f"`{display_number(matlab_check, '.10f')}` {SPECIFIC_CREEP_UNIT}"
+            f"`{display_number(matlab_check, '.10f')}` {SPECIFIC_CREEP_UNIT_HTML}",
+            unsafe_allow_html=True,
         )
-        st.write(
+        st.markdown(
             "Python reproduced prediction: "
-            f"`{display_number(py_check, '.10f')}` {SPECIFIC_CREEP_UNIT}"
+            f"`{display_number(py_check, '.10f')}` {SPECIFIC_CREEP_UNIT_HTML}",
+            unsafe_allow_html=True,
         )
-        st.write(
-            f"Difference: `{display_number(diff, '.10e')}` {SPECIFIC_CREEP_UNIT}"
+        st.markdown(
+            f"Difference: `{display_number(diff, '.10e')}` {SPECIFIC_CREEP_UNIT_HTML}",
+            unsafe_allow_html=True,
         )
