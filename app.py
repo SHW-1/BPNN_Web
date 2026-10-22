@@ -6,16 +6,42 @@ from pathlib import Path
 
 # =========================================================
 # BPNN-Based RAC Creep Prediction System
-# MATLAB exported model:
-# BPNN_Creep_Web_Model.mat
+# MATLAB exported model: BPNN_Creep_Web_Model.mat
 # =========================================================
 
 MODEL_FILE = "BPNN_Creep_Web_Model.mat"
 EXPECTED_INPUT_NUMBER = 8
+MINUS_SIGN = "\u2212"  # True mathematical minus sign: − (U+2212)
 
 
 # =========================================================
-# 1. Activation functions
+# 1. Unicode minus sign: display and input helpers
+# =========================================================
+
+def display_number(value, fmt=".6f"):
+    """Use the mathematical minus sign in numbers displayed to users.
+
+    Both a negative mantissa and a negative scientific exponent are converted.
+    Python arithmetic and numeric data retain the ordinary '-' operator.
+    """
+    return format(float(value), fmt).replace("-", MINUS_SIGN)
+
+
+def parse_number(value):
+    """Accept both − (U+2212) and - (ASCII hyphen-minus) from the user."""
+    number = float(str(value).strip().replace(MINUS_SIGN, "-"))
+    if not np.isfinite(number):
+        raise ValueError("The input must be a finite number.")
+    return number
+
+
+def normalize_input_sign(key):
+    """Normalize typed ASCII '-' to U+2212 when a text field is committed."""
+    st.session_state[key] = st.session_state[key].replace("-", MINUS_SIGN)
+
+
+# =========================================================
+# 2. Activation functions
 # =========================================================
 
 def tansig(x):
@@ -44,7 +70,7 @@ def apply_activation(x, name):
 
 
 # =========================================================
-# 2. Data conversion functions
+# 3. Data conversion functions
 # =========================================================
 
 def to_column_vector(x):
@@ -108,7 +134,7 @@ def get_optional_vector(mat, name, length, default_value):
 
 
 # =========================================================
-# 3. Load MATLAB exported model
+# 4. Load MATLAB exported model
 # =========================================================
 
 @st.cache_resource
@@ -118,13 +144,13 @@ def load_model():
     if not model_path.exists():
         raise FileNotFoundError(
             f"Model file not found: {MODEL_FILE}. "
-            f"Please put it in the same folder as app.py."
+            "Please put it in the same folder as app_unicode_minus.py."
         )
 
     mat = loadmat(
-        MODEL_FILE,
+        str(model_path),
         squeeze_me=True,
-        struct_as_record=False
+        struct_as_record=False,
     )
 
     required_vars = [
@@ -136,7 +162,7 @@ def load_model():
         "output_reverse_A", "output_reverse_b",
         "output_scale",
         "feature_default", "feature_min", "feature_max",
-        "residual_low95", "residual_high95"
+        "residual_low95", "residual_high95",
     ]
 
     for var in required_vars:
@@ -164,42 +190,23 @@ def load_model():
     output_ymin = to_scalar(mat["output_ymin"])
 
     output_scale = to_scalar(mat["output_scale"])
-
     if output_scale == 0:
         raise ValueError("output_scale cannot be zero.")
 
-    hidden_transfer = matlab_string(
-        mat["hidden_transferFcn"],
-        "tansig"
-    )
-
-    output_transfer = matlab_string(
-        mat["output_transferFcn"],
-        "purelin"
-    )
+    hidden_transfer = matlab_string(mat["hidden_transferFcn"], "tansig")
+    output_transfer = matlab_string(mat["output_transferFcn"], "purelin")
 
     residual_low95 = to_scalar(mat["residual_low95"])
     residual_high95 = to_scalar(mat["residual_high95"])
 
     feature_default = get_optional_vector(
-        mat,
-        "feature_default",
-        EXPECTED_INPUT_NUMBER,
-        0.0
+        mat, "feature_default", EXPECTED_INPUT_NUMBER, 0.0
     )
-
     feature_min = get_optional_vector(
-        mat,
-        "feature_min",
-        EXPECTED_INPUT_NUMBER,
-        np.nan
+        mat, "feature_min", EXPECTED_INPUT_NUMBER, np.nan
     )
-
     feature_max = get_optional_vector(
-        mat,
-        "feature_max",
-        EXPECTED_INPUT_NUMBER,
-        np.nan
+        mat, "feature_max", EXPECTED_INPUT_NUMBER, np.nan
     )
 
     # Dimension checks
@@ -208,7 +215,7 @@ def load_model():
 
     if input_number != input_process_A.shape[0]:
         raise ValueError(
-            f"IW and input_process_A dimension mismatch. "
+            "IW and input_process_A dimension mismatch. "
             f"IW shape: {W1.shape}, input_process_A shape: {input_process_A.shape}"
         )
 
@@ -220,7 +227,7 @@ def load_model():
 
     if b1.shape[0] != hidden_number:
         raise ValueError(
-            f"b1 size does not match hidden layer size. "
+            "b1 size does not match hidden layer size. "
             f"Hidden size: {hidden_number}, b1 size: {b1.shape[0]}"
         )
 
@@ -229,13 +236,13 @@ def load_model():
             W2 = W2.T
         else:
             raise ValueError(
-                f"LW shape does not match hidden layer size. "
+                "LW shape does not match hidden layer size. "
                 f"IW shape: {W1.shape}, LW shape: {W2.shape}"
             )
 
     if b2.shape[0] != W2.shape[0]:
         raise ValueError(
-            f"b2 size does not match output layer size. "
+            "b2 size does not match output layer size. "
             f"Output size: {W2.shape[0]}, b2 size: {b2.shape[0]}"
         )
 
@@ -255,45 +262,35 @@ def load_model():
         "b2": b2,
         "hidden_transfer": hidden_transfer,
         "output_transfer": output_transfer,
-
         "input_xoffset": input_xoffset,
         "input_gain": input_gain,
         "input_ymin": input_ymin,
-
         "output_xoffset": output_xoffset,
         "output_gain": output_gain,
         "output_ymin": output_ymin,
-
         "input_process_A": input_process_A,
         "input_process_b": input_process_b,
         "output_reverse_A": output_reverse_A,
         "output_reverse_b": output_reverse_b,
-
         "output_scale": output_scale,
         "feature_default": feature_default,
         "feature_min": feature_min,
         "feature_max": feature_max,
-
         "residual_low95": residual_low95,
         "residual_high95": residual_high95,
-
         "x_check": x_check,
         "y_check_web_matlab": y_check_web_matlab,
-
         "input_number": EXPECTED_INPUT_NUMBER,
         "hidden_number": hidden_number,
     }
 
 
 # =========================================================
-# 4. MATLAB mapminmax
+# 5. MATLAB mapminmax
 # =========================================================
 
 def mapminmax_apply(x, model):
-    """
-    MATLAB mapminmax apply:
-    y = (x - xoffset) * gain + ymin
-    """
+    """MATLAB mapminmax apply: y = (x - xoffset) * gain + ymin."""
     return (
         (x - model["input_xoffset"])
         * model["input_gain"]
@@ -302,10 +299,7 @@ def mapminmax_apply(x, model):
 
 
 def mapminmax_reverse(y_norm, model):
-    """
-    MATLAB mapminmax reverse:
-    x = (y - ymin) / gain + xoffset
-    """
+    """MATLAB mapminmax reverse: x = (y - ymin) / gain + xoffset."""
     return (
         (y_norm - model["output_ymin"])
         / model["output_gain"]
@@ -314,7 +308,7 @@ def mapminmax_reverse(y_norm, model):
 
 
 # =========================================================
-# 5. BPNN prediction
+# 6. BPNN prediction
 # =========================================================
 
 def predict_creep(input_values, model):
@@ -328,17 +322,11 @@ def predict_creep(input_values, model):
 
     # Hidden layer
     hidden_net = model["W1"] @ x_net + model["b1"]
-    hidden_output = apply_activation(
-        hidden_net,
-        model["hidden_transfer"]
-    )
+    hidden_output = apply_activation(hidden_net, model["hidden_transfer"])
 
     # Output layer
     output_net = model["W2"] @ hidden_output + model["b2"]
-    output_internal = apply_activation(
-        output_net,
-        model["output_transfer"]
-    )
+    output_internal = apply_activation(output_net, model["output_transfer"])
 
     # MATLAB network internal output reverse processing
     y_norm = (
@@ -356,13 +344,13 @@ def predict_creep(input_values, model):
 
 
 # =========================================================
-# 6. Streamlit interface
+# 7. Streamlit interface
 # =========================================================
 
 st.set_page_config(
     page_title="BPNN Creep Prediction System",
     page_icon="📈",
-    layout="centered"
+    layout="centered",
 )
 
 st.title("BPNN-Based RAC Creep Prediction System")
@@ -380,9 +368,7 @@ except Exception as e:
     st.error(f"Model loading failed: {e}")
     st.stop()
 
-
-# Display units only. All input values still use the numeric convention
-# of the original MATLAB training data; no unit conversion is performed.
+# Display units only. Inputs retain MATLAB training-data numeric conventions.
 feature_labels = [
     "Ordinary Portland cement content (Y1, kg/m³)",
     "RAC sand ratio (Y2, %)",
@@ -391,20 +377,20 @@ feature_labels = [
     "Creep test relative humidity (Y5, %)",
     "Compressive strength (Y6, MPa)",
     "Stress ratio (Y7, dimensionless)",
-    "Creep test duration (Y8, days)"
+    "Creep test duration (Y8, days)",
 ]
 
 feature_units = ["kg/m³", "%", "", "%", "%", "MPa", "", "days"]
 
-# Specific creep is conventionally presented in microstrain per MPa.
-# Verify that output_scale produces this numeric convention in the MATLAB model.
+# Confirm this unit with the actual MATLAB output_scale convention.
 SPECIFIC_CREEP_UNIT = "×10⁻⁶/MPa"
 output_label = "Predicted specific creep of RAC (Z)"
 
 st.subheader("Input Parameters")
+st.caption("Negative values use the mathematical minus sign (−, U+2212).")
 
 input_values = []
-
+invalid_inputs = []
 cols = st.columns(2)
 
 for i, label in enumerate(feature_labels):
@@ -412,61 +398,64 @@ for i, label in enumerate(feature_labels):
     min_value = model["feature_min"][i]
     max_value = model["feature_max"][i]
 
-    help_text = None
-
+    help_text = "Enter a number. Negative values are displayed using the mathematical minus sign (−)."
     if not np.isnan(min_value) and not np.isnan(max_value):
         unit_suffix = f" {feature_units[i]}" if feature_units[i] else ""
-        help_text = (
-            f"Training data range: {min_value:.6g} to {max_value:.6g}{unit_suffix}"
+        help_text += (
+            f" Training data range: {display_number(min_value, '.6g')}"
+            f" to {display_number(max_value, '.6g')}{unit_suffix}"
         )
 
-    if not np.isnan(min_value) and not np.isnan(max_value) and max_value > min_value:
-        step_value = float((max_value - min_value) / 100.0)
-    else:
-        step_value = 0.01
-
+    # Streamlit number_input renders negative values with ASCII '-'.
+    # text_input allows U+2212 to be displayed faithfully instead.
+    key = f"input_{i}"
     with cols[i % 2]:
-        value = st.number_input(
+        raw_value = st.text_input(
             label=label,
-            value=default_value,
-            step=step_value,
-            format="%.6f",
+            value=display_number(default_value, ".6f"),
             help=help_text,
-            key=f"input_{i}"
+            key=key,
+            on_change=normalize_input_sign,
+            args=(key,),
         )
 
-        input_values.append(value)
-
+        try:
+            input_values.append(parse_number(raw_value))
+        except ValueError:
+            input_values.append(None)
+            invalid_inputs.append(label)
 
 st.markdown("---")
 
 if st.button("Predict", use_container_width=True):
-    try:
-        prediction = predict_creep(input_values, model)
+    if invalid_inputs:
+        st.error("Please enter a valid finite number for: " + "; ".join(invalid_inputs))
+    else:
+        try:
+            prediction = predict_creep(input_values, model)
+            lower95 = prediction + model["residual_low95"]
+            upper95 = prediction + model["residual_high95"]
 
-        lower95 = prediction + model["residual_low95"]
-        upper95 = prediction + model["residual_high95"]
+            st.success(
+                f"{output_label}: {display_number(prediction)} {SPECIFIC_CREEP_UNIT}"
+            )
 
-        st.success(f"{output_label}: {prediction:.6f} {SPECIFIC_CREEP_UNIT}")
+            st.markdown("### Uncertainty Analysis")
+            st.info(
+                f"""
+                **95% Predictive Interval:**
+                [{display_number(lower95)}, {display_number(upper95)}] {SPECIFIC_CREEP_UNIT}
 
-        st.markdown("### Uncertainty Analysis")
+                **Interval method:** Residual calibration based on the test set.
+                """
+            )
 
-        st.info(
-            f"""
-            **95% Predictive Interval:** [{lower95:.6f}, {upper95:.6f}] {SPECIFIC_CREEP_UNIT}
+            st.markdown("### Input Summary")
+            for label, value in zip(feature_labels, input_values):
+                st.write(f"{label}: {display_number(value)}")
 
-            **Interval method:** Residual calibration based on the test set.
-            """
-        )
-
-        st.markdown("### Input Summary")
-
-        for label, value in zip(feature_labels, input_values):
-            st.write(f"{label}: {value:.6f}")
-
-    except Exception as e:
-        st.error(f"Prediction failed: {e}")
-
+        except Exception as e:
+            st.error(f"Prediction failed: {e}")
 
 st.markdown("---")
 
@@ -476,13 +465,19 @@ with st.expander("Model Consistency Check"):
     st.write(f"Output layer activation function: `{model['output_transfer']}`")
     st.write(f"Input number: `{model['input_number']}`")
     st.write(f"Hidden layer neurons: `{model['hidden_number']}`")
-    st.write(f"Output scale: `{model['output_scale']}`")
+    st.write(f"Output scale: `{display_number(model['output_scale'], '.12g')}`")
     st.write(f"IW shape: `{model['W1'].shape}`")
     st.write(f"LW shape: `{model['W2'].shape}`")
     st.write(f"input_process_A shape: `{model['input_process_A'].shape}`")
     st.write(f"output_reverse_A shape: `{model['output_reverse_A'].shape}`")
-    st.write(f"95% residual lower bound: `{model['residual_low95']}` {SPECIFIC_CREEP_UNIT}")
-    st.write(f"95% residual upper bound: `{model['residual_high95']}` {SPECIFIC_CREEP_UNIT}")
+    st.write(
+        "95% residual lower bound: "
+        f"`{display_number(model['residual_low95'], '.12g')}` {SPECIFIC_CREEP_UNIT}"
+    )
+    st.write(
+        "95% residual upper bound: "
+        f"`{display_number(model['residual_high95'], '.12g')}` {SPECIFIC_CREEP_UNIT}"
+    )
 
     if model["x_check"] is not None and model["y_check_web_matlab"] is not None:
         py_check = predict_creep(model["x_check"], model)
@@ -490,8 +485,19 @@ with st.expander("Model Consistency Check"):
         diff = py_check - matlab_check
 
         st.write("MATLAB exported check input:")
-        st.write(model["x_check"])
+        st.code(
+            "[" + ", ".join(display_number(x, ".10g") for x in model["x_check"]) + "]",
+            language=None,
+        )
 
-        st.write(f"MATLAB reference prediction: `{matlab_check:.10f}` {SPECIFIC_CREEP_UNIT}")
-        st.write(f"Python reproduced prediction: `{py_check:.10f}` {SPECIFIC_CREEP_UNIT}")
-        st.write(f"Difference: `{diff:.10e}` {SPECIFIC_CREEP_UNIT}")
+        st.write(
+            "MATLAB reference prediction: "
+            f"`{display_number(matlab_check, '.10f')}` {SPECIFIC_CREEP_UNIT}"
+        )
+        st.write(
+            "Python reproduced prediction: "
+            f"`{display_number(py_check, '.10f')}` {SPECIFIC_CREEP_UNIT}"
+        )
+        st.write(
+            f"Difference: `{display_number(diff, '.10e')}` {SPECIFIC_CREEP_UNIT}"
+        )
