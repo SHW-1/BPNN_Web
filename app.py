@@ -387,7 +387,6 @@ SPECIFIC_CREEP_UNIT = "×10⁻⁶/MPa"
 output_label = "Predicted specific creep of RAC (Z)"
 
 st.subheader("Input Parameters")
-st.caption("Negative values use the mathematical minus sign (−, U+2212).")
 
 input_values = []
 invalid_inputs = []
@@ -398,11 +397,11 @@ for i, label in enumerate(feature_labels):
     min_value = model["feature_min"][i]
     max_value = model["feature_max"][i]
 
-    help_text = "Enter a number. Negative values are displayed using the mathematical minus sign (−)."
+    help_text = None
     if not np.isnan(min_value) and not np.isnan(max_value):
         unit_suffix = f" {feature_units[i]}" if feature_units[i] else ""
-        help_text += (
-            f" Training data range: {display_number(min_value, '.6g')}"
+        help_text = (
+            f"Training data range: {display_number(min_value, '.6g')}"
             f" to {display_number(max_value, '.6g')}{unit_suffix}"
         )
 
